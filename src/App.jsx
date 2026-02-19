@@ -69,7 +69,7 @@ function ChargerBody({ status, connectorType, power, energy, soc, sessionTime })
                             <span>SOC</span><span style={{ color: "#00e5a0" }}>{soc.toFixed(0)}%</span>
                         </div>
                         <div style={{ height: 6, background: "#1a2535", borderRadius: 4, overflow: "hidden" }}>
-                            <div style={{ height: "100%", width: `${soc}%`, background: "linear-gradient(90deg, #00e5a0, #00b4ff)", borderRadius: 4, transition: "width 1s ease", boxShadow: "0 0 8px #00e5a060" }} />
+                            <div style={{ height: "100%", width: `${soc}%`, background: "linear-gradient(90deg, #00e5a0, #00b4ff)", borderRadius: 4, transition: "width 0.8s ease", boxShadow: "0 0 8px #00e5a060" }} />
                         </div>
                     </div>
                     <div style={{ display: "flex", justifyContent: "space-between", fontFamily: "monospace", fontSize: 11, color: "#4a6a8a" }}>
@@ -110,17 +110,56 @@ function ConfigPanel({ config, onChange, connected }) {
             )}
         </div>
     );
+
+    // Calcular potência estimada com base nas configurações de SOC/tempo
+    const socRange = config.socEnd - config.socStart;
+    const batteryKwh = config.batteryCapacity;
+    const energyNeeded = (socRange / 100) * batteryKwh;
+    const estimatedPower = config.chargeDurationMin > 0
+        ? (energyNeeded / (config.chargeDurationMin / 60)).toFixed(1)
+        : "—";
+
     return (
         <div>
+            {/* Conexão */}
+            <div style={{ fontSize: 9, letterSpacing: 2, color: "#1e3a5a", textTransform: "uppercase", marginBottom: 10, paddingBottom: 5, borderBottom: "1px solid #0d1a2a" }}>Conexão</div>
             {field("CSMS URL (WebSocket)", "csmsUrl")}
             {field("Station ID", "stationId")}
+            {field("Heartbeat Interval (s)", "heartbeatInterval", "number", { min: 10, max: 300 })}
+
+            {/* Hardware */}
+            <div style={{ fontSize: 9, letterSpacing: 2, color: "#1e3a5a", textTransform: "uppercase", margin: "16px 0 10px", paddingBottom: 5, borderBottom: "1px solid #0d1a2a" }}>Hardware</div>
             {field("Fabricante", "vendor")}
             {field("Modelo", "model")}
             {field("Número de Série", "serialNumber")}
-            {field("Potência Máx (kW)", "maxPower", "number", { min: 1, max: 350 })}
             {field("Tipo de Conector", "connectorType", "text", { select: true, options: ["CCS2", "CHAdeMO", "Type2", "Tesla", "GB/T"] })}
-            {field("Heartbeat Interval (s)", "heartbeatInterval", "number", { min: 10, max: 300 })}
             {field("Voltagem (V)", "voltage", "number", { min: 100, max: 1000 })}
+            {field("Potência Máx (kW)", "maxPower", "number", { min: 1, max: 350 })}
+
+            {/* Simulação de Carga */}
+            <div style={{ fontSize: 9, letterSpacing: 2, color: "#00b4ff88", textTransform: "uppercase", margin: "16px 0 10px", paddingBottom: 5, borderBottom: "1px solid #0d1a2a" }}>⚡ Simulação de Carga</div>
+            {field("Capacidade da Bateria (kWh)", "batteryCapacity", "number", { min: 5, max: 200 })}
+            {field("SOC Inicial (%)", "socStart", "number", { min: 0, max: 99 })}
+            {field("SOC Final (%)", "socEnd", "number", { min: 1, max: 100 })}
+            {field("Tempo para completar (min)", "chargeDurationMin", "number", { min: 1, max: 480 })}
+
+            {/* Preview */}
+            <div style={{ background: "#070c14", border: "1px solid #0d2a1a", borderRadius: 8, padding: "10px 12px", marginTop: 4 }}>
+                <div style={{ fontSize: 9, color: "#2a6a4a", letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 8 }}>Preview da Simulação</div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "4px 8px" }}>
+                    {[
+                        { l: "Intervalo SOC", v: `${config.socStart}% → ${config.socEnd}%`, c: "#00e5a0" },
+                        { l: "Duração", v: `${config.chargeDurationMin} min`, c: "#a78bfa" },
+                        { l: "Energia necessária", v: `${((config.socEnd - config.socStart) / 100 * config.batteryCapacity).toFixed(1)} kWh`, c: "#00b4ff" },
+                        { l: "Potência estimada", v: `${estimatedPower} kW`, c: "#f0c040" },
+                    ].map(({ l, v, c }) => (
+                        <div key={l} style={{ padding: "5px 0" }}>
+                            <div style={{ fontSize: 8, color: "#2a4a3a", letterSpacing: 1, textTransform: "uppercase" }}>{l}</div>
+                            <div style={{ fontSize: 13, color: c, fontWeight: 700, fontFamily: "monospace" }}>{v}</div>
+                        </div>
+                    ))}
+                </div>
+            </div>
         </div>
     );
 }
@@ -154,10 +193,22 @@ function btnStyle(color, disabled = false) {
 
 export default function App() {
     const [config, setConfig] = useState({
-        csmsUrl: "ws://localhost:9000/ocpp", stationId: "EVCS-001",
-        vendor: "VoltCore Systems", model: "VC-150DC", serialNumber: "VC2024000001",
-        maxPower: 50, connectorType: "CCS2", heartbeatInterval: 30, voltage: 400,
+        csmsUrl: "ws://localhost:9000/ocpp",
+        stationId: "EVCS-001",
+        vendor: "VoltCore Systems",
+        model: "VC-150DC",
+        serialNumber: "VC2024000001",
+        maxPower: 50,
+        connectorType: "CCS2",
+        heartbeatInterval: 30,
+        voltage: 400,
+        // Simulação de carga
+        batteryCapacity: 60,   // kWh
+        socStart: 20,          // %
+        socEnd: 100,           // %
+        chargeDurationMin: 5,  // minutos para ir de socStart até socEnd
     });
+
     const [status, setStatus] = useState(STATUS.Available);
     const [connected, setConnected] = useState(false);
     const [simMode, setSimMode] = useState(false);
@@ -167,6 +218,7 @@ export default function App() {
     const [power, setPower] = useState(0);
     const [idTagInput, setIdTagInput] = useState("USER001");
     const [tick, setTick] = useState(0);
+
     const wsRef = useRef(null);
     const heartbeatRef = useRef(null);
     const meterRef = useRef(null);
@@ -182,7 +234,7 @@ export default function App() {
         setLogs(prev => [...prev.slice(-200), { dir, msg, time }]);
     }, []);
 
-    const simulateCsmsResponse = useCallback((action, payload) => {
+    const simulateCsmsResponse = useCallback((action) => {
         let response = {};
         if (action === "BootNotification") response = { currentTime: now(), interval: configRef.current.heartbeatInterval, status: "Accepted" };
         else if (action === "Heartbeat") response = { currentTime: now() };
@@ -194,7 +246,7 @@ export default function App() {
     const sendOCPP = useCallback((action, payload) => {
         addLog("TX", `${action} → ${JSON.stringify(payload).slice(0, 120)}`);
         if (simMode || !wsRef.current) {
-            setTimeout(() => simulateCsmsResponse(action, payload), 350);
+            setTimeout(() => simulateCsmsResponse(action), 350);
         } else if (wsRef.current?.readyState === WebSocket.OPEN) {
             wsRef.current.send(JSON.stringify([OCPP_MSG.CALL, uid(), action, payload]));
         }
@@ -214,8 +266,7 @@ export default function App() {
         if (sim) {
             addLog("SYS", "[SIM] Conectado ao CSMS simulado");
             setConnected(true); setSimMode(true); setStatus(STATUS.Available);
-            setTimeout(sendBoot, 300); startHeartbeat();
-            return;
+            setTimeout(sendBoot, 300); startHeartbeat(); return;
         }
         try {
             const ws = new WebSocket(configRef.current.csmsUrl, ["ocpp2.0.1"]);
@@ -232,9 +283,16 @@ export default function App() {
         const ses = sessionRef.current;
         if (!ses) return;
         setStatus(STATUS.Finishing);
-        addLog("SYS", `Sessão encerrada | energia=${ses.energy.toFixed(3)} kWh`);
-        sendOCPP("TransactionEvent", { eventType: "Ended", timestamp: now(), triggerReason: "StopAuthorized", seqNo: 99, transactionInfo: { transactionId: ses.transactionId, chargingState: "Idle", stoppedReason: "Local" }, meterValue: [{ timestamp: now(), sampledValue: [{ value: Math.round(ses.energy * 1000), measurand: "Energy.Active.Import.Register", unit: "Wh" }] }] });
-        setTimeout(() => { setSession(null); sessionRef.current = null; setPower(0); setStatus(STATUS.Available); sendOCPP("StatusNotification", { timestamp: now(), connectorStatus: "Available", evseId: 1, connectorId: 1 }); }, 2000);
+        addLog("SYS", `Sessão encerrada | energia=${ses.energy.toFixed(3)} kWh | SOC final=${ses.soc.toFixed(1)}%`);
+        sendOCPP("TransactionEvent", {
+            eventType: "Ended", timestamp: now(), triggerReason: "StopAuthorized", seqNo: 99,
+            transactionInfo: { transactionId: ses.transactionId, chargingState: "Idle", stoppedReason: "Local" },
+            meterValue: [{ timestamp: now(), sampledValue: [{ value: Math.round(ses.energy * 1000), measurand: "Energy.Active.Import.Register", unit: "Wh" }] }],
+        });
+        setTimeout(() => {
+            setSession(null); sessionRef.current = null; setPower(0); setStatus(STATUS.Available);
+            sendOCPP("StatusNotification", { timestamp: now(), connectorStatus: "Available", evseId: 1, connectorId: 1 });
+        }, 2000);
     }, [addLog, sendOCPP]);
 
     const disconnect = useCallback(() => {
@@ -247,20 +305,91 @@ export default function App() {
 
     const startSession = useCallback(() => {
         if (!connected) return;
+        const cfg = configRef.current;
         const txId = uid();
-        const ses = { startTime: Date.now(), energy: 0, soc: 20, transactionId: txId, idTag: idTagInput };
+
+        // ── Calcular taxa de incremento por segundo ──────────────────────────────
+        // socRange em % que precisa ser percorrido
+        const socRange = cfg.socEnd - cfg.socStart;
+        // Energia total a ser entregue (kWh)
+        const totalEnergy = (socRange / 100) * cfg.batteryCapacity;
+        // Duração total em segundos
+        const totalSeconds = cfg.chargeDurationMin * 60;
+        // Incremento de SOC por segundo
+        const socIncPerSec = socRange / totalSeconds;
+        // Incremento de energia (kWh) por segundo
+        const energyIncPerSec = totalEnergy / totalSeconds;
+        // Potência equivalente em kW (constante)
+        const chargePower = totalEnergy / (cfg.chargeDurationMin / 60);
+
+        const ses = { startTime: Date.now(), energy: 0, soc: cfg.socStart, transactionId: txId, idTag: idTagInput, totalSeconds, socEnd: cfg.socEnd };
         setSession(ses); sessionRef.current = ses;
         setStatus(STATUS.Preparing);
-        addLog("SYS", `Sessão iniciada | txId=${txId} | idTag=${idTagInput}`);
+        addLog("SYS", `Sessão iniciada | txId=${txId} | SOC ${cfg.socStart}%→${cfg.socEnd}% | ${cfg.chargeDurationMin}min | ${chargePower.toFixed(1)}kW`);
         sendOCPP("Authorize", { idToken: { idToken: idTagInput, type: "ISO14443" } });
+
         setTimeout(() => {
             setStatus(STATUS.Charging);
-            sendOCPP("TransactionEvent", { eventType: "Started", timestamp: now(), triggerReason: "Authorized", seqNo: 0, transactionInfo: { transactionId: txId, chargingState: "Charging" }, idToken: { idToken: idTagInput, type: "ISO14443" }, evse: { id: 1, connectorId: 1 } });
+            setPower(chargePower);
+            sendOCPP("TransactionEvent", {
+                eventType: "Started", timestamp: now(), triggerReason: "Authorized", seqNo: 0,
+                transactionInfo: { transactionId: txId, chargingState: "Charging" },
+                idToken: { idToken: idTagInput, type: "ISO14443" },
+                evse: { id: 1, connectorId: 1 },
+                meterValue: [{ timestamp: now(), sampledValue: [{ value: 0, measurand: "Energy.Active.Import.Register", unit: "Wh" }] }],
+            });
+
+            let seqNo = 1;
+
             meterRef.current = setInterval(() => {
-                const p = configRef.current.maxPower * (0.7 + Math.random() * 0.3);
-                const e = p / 3600;
-                setPower(p);
-                setSession(prev => { if (!prev) return prev; const n = { ...prev, energy: prev.energy + e, soc: Math.min(100, prev.soc + e * 2) }; sessionRef.current = n; return n; });
+                setSession(prev => {
+                    if (!prev) return prev;
+
+                    const newSoc = Math.min(prev.soc + socIncPerSec, cfg.socEnd);
+                    const newEnergy = prev.energy + energyIncPerSec;
+
+                    const updated = { ...prev, energy: newEnergy, soc: newSoc };
+                    sessionRef.current = updated;
+
+                    // Enviar MeterValues a cada 30s de simulação
+                    if (Math.round(newEnergy * 1000) % 300 < Math.round(energyIncPerSec * 1000) + 1) {
+                        sendOCPP("MeterValues", {
+                            evseId: 1, transactionId: txId,
+                            meterValue: [{ timestamp: now(), sampledValue: [
+                                    { value: Math.round(newEnergy * 1000), measurand: "Energy.Active.Import.Register", unit: "Wh" },
+                                    { value: Math.round(chargePower * 1000), measurand: "Power.Active.Import", unit: "W" },
+                                    { value: newSoc.toFixed(1), measurand: "SoC", unit: "Percent" },
+                                ]}],
+                        });
+                        seqNo++;
+                    }
+
+                    // SOC atingiu o alvo → encerrar automaticamente
+                    if (newSoc >= cfg.socEnd) {
+                        clearInterval(meterRef.current);
+                        addLog("SYS", `✅ SOC alvo ${cfg.socEnd}% atingido — encerrando sessão automaticamente`);
+                        // Aguarda 1 tick para o estado ser salvo antes de encerrar
+                        setTimeout(() => {
+                            const finalSes = sessionRef.current;
+                            if (!finalSes) return;
+                            setStatus(STATUS.Finishing);
+                            sendOCPP("TransactionEvent", {
+                                eventType: "Ended", timestamp: now(), triggerReason: "EVDeparted", seqNo: 99,
+                                transactionInfo: { transactionId: txId, chargingState: "Idle", stoppedReason: "EVDisconnected" },
+                                meterValue: [{ timestamp: now(), sampledValue: [
+                                        { value: Math.round(finalSes.energy * 1000), measurand: "Energy.Active.Import.Register", unit: "Wh" },
+                                        { value: cfg.socEnd, measurand: "SoC", unit: "Percent" },
+                                    ]}],
+                            });
+                            setTimeout(() => {
+                                setSession(null); sessionRef.current = null; setPower(0); setStatus(STATUS.Available);
+                                sendOCPP("StatusNotification", { timestamp: now(), connectorStatus: "Available", evseId: 1, connectorId: 1 });
+                            }, 2000);
+                        }, 500);
+                    }
+
+                    return updated;
+                });
             }, 1000);
         }, 1500);
     }, [connected, idTagInput, addLog, sendOCPP]);
@@ -271,8 +400,16 @@ export default function App() {
         return `${Math.floor(s / 3600).toString().padStart(2, "0")}:${Math.floor((s % 3600) / 60).toString().padStart(2, "0")}`;
     };
 
+    // Progresso da sessão (0-100%)
+    const sessionProgress = session
+        ? Math.min(((session.soc - config.socStart) / Math.max(config.socEnd - config.socStart, 1)) * 100, 100)
+        : 0;
+
     const color = STATUS_COLOR[status] || "#6b7280";
     const configChange = (k, v) => setConfig(c => ({ ...c, [k]: v }));
+
+    // Potência exibida (calculada a partir das configurações atuais)
+    const displayPower = power > 0 ? power : 0;
 
     return (
         <>
@@ -286,6 +423,7 @@ export default function App() {
         select, input { font-family: monospace !important; }
       `}</style>
             <div style={{ minHeight: "100vh", background: "radial-gradient(ellipse at 20% 50%, #0a1525 0%, #060a12 60%)", color: "#c0cce0", fontFamily: "'JetBrains Mono', monospace", display: "flex", flexDirection: "column", alignItems: "center", padding: "32px 16px" }}>
+
                 {/* Header */}
                 <div style={{ textAlign: "center", marginBottom: 32 }}>
                     <div style={{ fontSize: 11, letterSpacing: 6, color: "#2a4a6a", marginBottom: 6, textTransform: "uppercase" }}>Simulador OCPP 2.0.1</div>
@@ -301,17 +439,56 @@ export default function App() {
 
                 {/* Grid */}
                 <div style={{ display: "grid", gridTemplateColumns: "220px 1fr", gap: 24, maxWidth: 900, width: "100%" }}>
+
                     {/* Left */}
                     <div>
-                        <ChargerBody status={status} connectorType={config.connectorType} power={power} energy={session?.energy ?? 0} soc={session?.soc ?? 0} sessionTime={sessionElapsed()} />
+                        <ChargerBody status={status} connectorType={config.connectorType} power={displayPower} energy={session?.energy ?? 0} soc={session?.soc ?? 0} sessionTime={sessionElapsed()} />
+
                         <div style={{ display: "flex", justifyContent: "space-around", marginTop: 16, background: "#080d18", borderRadius: 12, padding: "12px 4px", border: "1px solid #1a2535" }}>
-                            <Gauge value={power} max={config.maxPower} label="Potência" unit="kW" color="#00b4ff" />
+                            <Gauge value={displayPower} max={config.maxPower} label="Potência" unit="kW" color="#00b4ff" />
                             <Gauge value={session?.soc ?? 0} max={100} label="SOC" unit="%" color="#00e5a0" />
                         </div>
+
+                        {/* Barra de progresso da sessão */}
+                        {session && (
+                            <div style={{ marginTop: 12, background: "#080d18", borderRadius: 8, padding: "10px 12px", border: "1px solid #1a2535" }}>
+                                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, color: "#3a5a7a", letterSpacing: 1, textTransform: "uppercase", marginBottom: 6 }}>
+                                    <span>Progresso</span>
+                                    <span style={{ color: "#00b4ff" }}>{sessionProgress.toFixed(0)}%</span>
+                                </div>
+                                <div style={{ height: 4, background: "#1a2535", borderRadius: 4, overflow: "hidden" }}>
+                                    <div style={{ height: "100%", width: `${sessionProgress}%`, background: "linear-gradient(90deg, #00b4ff, #00e5a0)", borderRadius: 4, transition: "width 0.8s ease" }} />
+                                </div>
+                                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, color: "#2a4a5a", marginTop: 4 }}>
+                                    <span>{config.socStart}%</span><span>{config.socEnd}%</span>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Configuração rápida de carga */}
+                        {!connected && (
+                            <div style={{ marginTop: 12, background: "#080d18", border: "1px solid #0d2a1a", borderRadius: 8, padding: "10px 12px" }}>
+                                <div style={{ fontSize: 9, color: "#2a5a3a", letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 8 }}>⚡ Carga Rápida</div>
+                                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6 }}>
+                                    {[
+                                        { label: "20%→100%\n5min", soc1: 20, soc2: 100, min: 5 },
+                                        { label: "10%→80%\n3min", soc1: 10, soc2: 80, min: 3 },
+                                        { label: "0%→100%\n10min", soc1: 0, soc2: 100, min: 10 },
+                                    ].map(p => (
+                                        <button key={p.label} onClick={() => setConfig(c => ({ ...c, socStart: p.soc1, socEnd: p.soc2, chargeDurationMin: p.min }))}
+                                                style={{ background: "#0a1520", border: "1px solid #1a3a2a", borderRadius: 6, color: "#00e5a0", fontSize: 9, padding: "6px 4px", cursor: "pointer", fontFamily: "monospace", lineHeight: 1.5, whiteSpace: "pre-wrap", textAlign: "center" }}>
+                                            {p.label}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
                         <div style={{ marginTop: 12 }}>
                             <label style={{ fontSize: 9, color: "#3a5a7a", letterSpacing: 1.5, textTransform: "uppercase", display: "block", marginBottom: 4 }}>ID Tag (RFID / App)</label>
                             <input value={idTagInput} onChange={(e) => setIdTagInput(e.target.value)} style={inputStyle(false)} placeholder="USER001" />
                         </div>
+
                         <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 12 }}>
                             {!connected ? (
                                 <>
@@ -341,10 +518,10 @@ export default function App() {
                                 <SectionTitle>Estado da Estação</SectionTitle>
                                 <InfoGrid items={[
                                     { label: "Status", value: status, color },
-                                    { label: "Potência Atual", value: `${power.toFixed(2)} kW` },
+                                    { label: "Potência Atual", value: `${displayPower.toFixed(2)} kW` },
                                     { label: "Potência Máx", value: `${config.maxPower} kW` },
                                     { label: "Voltagem", value: `${config.voltage} V` },
-                                    { label: "Corrente", value: power > 0 ? `${((power * 1000) / config.voltage).toFixed(1)} A` : "0 A" },
+                                    { label: "Corrente", value: displayPower > 0 ? `${((displayPower * 1000) / config.voltage).toFixed(1)} A` : "0 A" },
                                     { label: "Conector", value: config.connectorType },
                                 ]} />
                                 {session && <>
@@ -353,11 +530,22 @@ export default function App() {
                                         { label: "Transaction ID", value: session.transactionId },
                                         { label: "ID Tag", value: session.idTag },
                                         { label: "Energia", value: `${session.energy.toFixed(3)} kWh` },
-                                        { label: "SOC", value: `${session.soc.toFixed(1)}%` },
+                                        { label: "SOC Atual", value: `${session.soc.toFixed(1)}%`, color: "#00e5a0" },
+                                        { label: "SOC Alvo", value: `${config.socEnd}%`, color: "#f0c040" },
                                         { label: "Duração", value: sessionElapsed() },
+                                        { label: "Tempo restante", value: (() => { const remaining = Math.max(0, session.totalSeconds - Math.floor((Date.now() - session.startTime) / 1000)); return `${Math.floor(remaining / 60).toString().padStart(2, "0")}:${(remaining % 60).toString().padStart(2, "0")}`; })(), color: "#a78bfa" },
                                         { label: "Custo Est.", value: `R$ ${(session.energy * 1.5).toFixed(2)}` },
                                     ]} />
                                 </>}
+                                <SectionTitle style={{ marginTop: 20 }}>Configuração de Carga</SectionTitle>
+                                <InfoGrid items={[
+                                    { label: "SOC Inicial", value: `${config.socStart}%`, color: "#f0c040" },
+                                    { label: "SOC Final", value: `${config.socEnd}%`, color: "#00e5a0" },
+                                    { label: "Duração", value: `${config.chargeDurationMin} min`, color: "#a78bfa" },
+                                    { label: "Bateria", value: `${config.batteryCapacity} kWh` },
+                                    { label: "Energia total", value: `${((config.socEnd - config.socStart) / 100 * config.batteryCapacity).toFixed(1)} kWh`, color: "#00b4ff" },
+                                    { label: "Potência sim.", value: `${(((config.socEnd - config.socStart) / 100 * config.batteryCapacity) / (config.chargeDurationMin / 60)).toFixed(1)} kW`, color: "#f0c040" },
+                                ]} />
                                 <SectionTitle style={{ marginTop: 20 }}>Informações OCPP</SectionTitle>
                                 <InfoGrid items={[
                                     { label: "Protocolo", value: "OCPP 2.0.1" },
@@ -371,7 +559,7 @@ export default function App() {
                         )}
 
                         {tab === "config" && (
-                            <div style={{ background: "#080d18", border: "1px solid #1a2535", borderRadius: 10, padding: 20 }}>
+                            <div style={{ background: "#080d18", border: "1px solid #1a2535", borderRadius: 10, padding: 20, overflowY: "auto", maxHeight: 600 }}>
                                 {connected && <div style={{ background: "#1a1500", border: "1px solid #3a2a00", borderRadius: 6, padding: "8px 12px", fontSize: 10, color: "#f0c040", marginBottom: 16 }}>⚠ Desconecte para editar todos os campos.</div>}
                                 <ConfigPanel config={config} onChange={configChange} connected={connected} />
                             </div>
