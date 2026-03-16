@@ -390,7 +390,7 @@ function btnStyle(color, disabled = false) {
 // ─── APP ──────────────────────────────────────────────────────────────────────
 export default function App() {
     const [config, setConfig] = useState({
-        csmsUrl: "ws://localhost:9000/ocpp",
+        csmsUrl: "ws://localhost:8080/ocpp/114f0afc-b809-48e4-b53c-17a1fd285a88",
         stationId: "EVCS-001",
         vendor: "VoltCore Systems",
         model: "VC-150DC",
